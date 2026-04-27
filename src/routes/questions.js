@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../lib/prisma");
-const questions = require("../data/questions");
+const authenticate = require("../middleware/auth");
+const isOwner = require("../middleware/isOwner");
 
 function formatQuestion(question) {
   return {
@@ -9,6 +10,8 @@ function formatQuestion(question) {
     keywords: question.keywords.map((k) => k.name),
   };
 }
+
+router.use(authenticate);
 
 // GET /api/questions/, /api/questions?keyword=sweden
 router.get("/", async (req, res) => {
@@ -58,6 +61,7 @@ router.post("/", async (req, res) => {
   const newQuestion = await prisma.question.create({
     data: {
       quiz, answer,
+      userId: req.user.userId,
       keywords: {
         connectOrCreate: keywordsArray.map((kw) => ({
           where: { name: kw }, create: { name: kw },
@@ -70,7 +74,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /questions/:questionId
-router.put("/:questionId", async (req, res) => {
+router.put("/:questionId", isOwner, async (req, res) => {
   const questionId = Number(req.params.questionId);
   const { quiz, answer, keywords } = req.body;
   const existingQuestion = await prisma.question.findUnique({ where: { id: questionId } });
@@ -101,7 +105,7 @@ router.put("/:questionId", async (req, res) => {
 });
 
 // DELETE /questions/:questionId
-router.delete("/:questionId", async (req, res) => {
+router.delete("/:questionId", isOwner, async (req, res) => {
   const questionId = Number(req.params.questionId);
 
   const question = await prisma.question.findUnique({
